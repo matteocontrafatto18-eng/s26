@@ -1,65 +1,222 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
+import MapView from './components/Mapview';
+import CardStop from './components/CardStop';
+import SearchAutocomplete from './components/SearchAutocomplete';
+
+// --- INTERFACCE ---
+export interface Day {
+  id: number;
+  coords: [number, number];
+  destination: string;
+  label: string;
+  date?: string;
+  note?: string;
+}
+
+export default function TuaPage() {
+  const [days, setDays] = useState<Day[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selDay, setSelDay] = useState<number | null>(null);
+
+  // 1. CARICAMENTO INIZIALE (FETCH)
+  const fetchStops = async () => {
+    const { data, error } = await supabase
+      .from('stops')
+      .select('*')
+      .order('id', { ascending: true });
+
+    if (!error && data) {
+      setDays(data);
+      if (data.length > 0 && selDay === null) setSelDay(data[0].id);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchStops();
+
+    // REALTIME: Ascolta i cambiamenti degli altri utenti
+    const channel = supabase
+      .channel('db-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'stops' }, () => {
+        fetchStops(); 
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
+  // 2. AGGIUNTA OTTIMISTICA (ISTANTANEA)
+  const addStop = async (name: string, coords: [number, number]) => {
+    const nextNum = days.length + 1;
+    const newLabel = nextNum < 10 ? `0${nextNum}` : `${nextNum}`;
+    
+    // Creiamo un ID temporaneo per la UI
+    const tempId = Math.floor(Math.random() * 1000000);
+    const newStop: Day = {
+      id: tempId,
+      label: newLabel,
+      destination: name.toUpperCase(),
+      coords: coords,
+      note: ""
+    };
+
+    // Aggiorna subito la UI
+    setDays([...days, newStop]);
+    setSelDay(tempId);
+
+    // Salva nel DB
+    const { error } = await supabase
+      .from('stops')
+      .insert([{
+        label: newLabel,
+        destination: name.toUpperCase(),
+        coords: coords,
+        note: ""
+      }]);
+
+    if (error) {
+      fetchStops(); // Se fallisce, ripristina i dati reali dal DB
+      alert("Errore nell'aggiunta: " + error.message);
+    }
+  };
+
+  // 3. RIMOZIONE OTTIMISTICA (ISTANTANEA)
+  const removeStop = async (id: number) => {
+    const backup = [...days];
+    // Togli subito dalla vista
+    setDays(days.filter(d => d.id !== id));
+
+    const { error } = await supabase
+      .from('stops')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      setDays(backup); // Ripristina se il server dà errore
+      alert("Errore nell'eliminazione");
+    }
+  };
+
+  // 4. FUNZIONE SPOSTAMENTO (REORDER)
+  // Nota: Al momento lo spostamento è solo locale per la sessione. 
+  // Per salvarlo nel DB servirebbe una colonna "sort_order".
+  const moveStop = (index: number, direction: 'up' | 'down') => {
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= days.length) return;
+
+    const newDays = [...days];
+    [newDays[index], newDays[newIndex]] = [newDays[newIndex], newDays[index]];
+
+    // Aggiorna le label (01, 02...) basandosi sulla nuova posizione
+    const updatedDays = newDays.map((d, i) => ({
+      ...d,
+      label: (i + 1) < 10 ? `0${i + 1}` : `${i + 1}`
+    }));
+
+    setDays(updatedDays);
+  };
+
+  if (loading) return (
+    <div className="min-h-screen bg-white flex items-center justify-center font-mono uppercase tracking-[0.3em]">
+      Sicilia is loading...
+    </div>
+  );
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="min-h-screen bg-white text-black font-mono selection:bg-[#FBBF24]">
+      
+      {/* HEADER */}
+      <header className="border-b-2 border-black sticky top-0 bg-white z-50">
+        <div className="max-w-7xl mx-auto px-6 py-6 flex flex-col md:flex-row justify-between items-center gap-6">
+          <div className="text-center md:text-left">
+            <h1 className="text-5xl font-black tracking-tighter leading-none">
+              SICILIA<span className="text-[#FBBF24]">.</span>
+            </h1>
+            <p className="text-[9px] uppercase tracking-[0.4em] mt-1 font-bold text-gray-400">Collaborative Planner v2.0</p>
+          </div>
+          
+          <div className="w-full md:w-96">
+            <SearchAutocomplete onSelect={(name, coords) => addStop(name, coords)} />
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-6 py-10">
+        
+      {/* MAPPA SECTION - Corretta per eliminare il rettangolo sotto */}
+      <section className="mb-12 border-2 border-black bg-black h-[500px] relative overflow-hidden flex flex-col">
+        <div className="flex-1 w-full h-full p-0 m-0 leading-[0] overflow-hidden">
+          <MapView 
+            days={days}
+            acts={[]}
+            accs={[]}
+            selDay={selDay || 0}
+          />
         </div>
+      </section>
+
+        {/* LISTA CARD */}
+        <section>
+          <div className="flex items-center gap-4 mb-8">
+            <h2 className="text-3xl font-black uppercase italic italic">Itinerario</h2>
+            <div className="h-[2px] flex-1 bg-black opacity-10"></div>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Live Sync</span>
+            </div>
+          </div>
+
+          {days.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-0 border-t border-l border-black">
+              {days.map((stop, index) => (
+                <div key={stop.id} id={`card-${stop.id}`} className="border-r border-b border-black group relative">
+                  <CardStop 
+                    stop={stop}
+                    index={index}
+                    isActive={selDay === stop.id}
+                    acts={[]}
+                    accs={[]}
+                    onClick={(id) => setSelDay(Number(id))}
+                    onDelete={(id) => removeStop(id)}
+                  />
+                  
+                  {/* Tasti Spostamento (Appaiono al passaggio del mouse) */}
+                  <div className="absolute bottom-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button 
+                      onClick={() => moveStop(index, 'up')}
+                      className="w-8 h-8 border border-black hover:bg-black hover:text-white flex items-center justify-center text-xs"
+                    >
+                      ↑
+                    </button>
+                    <button 
+                      onClick={() => moveStop(index, 'down')}
+                      className="w-8 h-8 border border-black hover:bg-black hover:text-white flex items-center justify-center text-xs"
+                    >
+                      ↓
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="py-32 text-center border-2 border-dashed border-gray-200 grayscale">
+              <p className="text-xs uppercase tracking-[0.5em] text-gray-400 font-bold">Cerca una località per iniziare</p>
+            </div>
+          )}
+        </section>
       </main>
+
+      <footer className="max-w-7xl mx-auto px-6 py-12 border-t border-gray-100 flex flex-col md:flex-row justify-between items-center text-[9px] uppercase tracking-[0.2em] text-gray-400 gap-4">
+        <p>Progetto Sicilia 2026 — Built with Next.js & Supabase</p>
+        <div className="flex gap-6">
+          <span className="text-black font-bold">Status: Online</span>
+          <span>OpenStreetMap Contributors</span>
+        </div>
+      </footer>
     </div>
   );
 }
