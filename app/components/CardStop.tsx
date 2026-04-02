@@ -27,26 +27,39 @@ export default function CardStop({
         isActive ? 'bg-[#FBBF24]/5' : 'bg-white hover:bg-gray-50'
       }`}
     >
-      {/* TASTO CANCELLA - Minimalista Rosso */}
-      <button 
-        onClick={(e) => {
-          e.stopPropagation();
-          onDelete(stop.id as number);
-        }}
-        className="absolute top-4 right-4 z-10 opacity-0 group-hover:opacity-100 p-2 text-black hover:text-[#EF4444] transition-all"
-        title="Rimuovi tappa"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="square" strokeLinejoin="miter"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-      </button>
+{/* TASTO CANCELLA - Sempre visibile e accessibile */}
+<button 
+  onClick={(e) => {
+    e.stopPropagation();
+    onDelete(stop.id as number);
+  }}
+  className="absolute top-2 right-2 z-30 p-2 
+             text-black hover:text-[#EF4444] 
+             bg-white/80 backdrop-blur-sm border border-transparent hover:border-black
+             transition-all active:scale-90 touch-manipulation"
+  title="Rimuovi tappa"
+>
+  <svg 
+    xmlns="http://www.w3.org/2000/svg" 
+    width="18" 
+    height="18" 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    strokeWidth="3" 
+    strokeLinecap="square" 
+    strokeLinejoin="miter"
+  >
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+</button>
 
       <div className="flex flex-col h-full">
-        {/* HEADER: Numero e Data */}
+        {/* HEADER: Numero */}
         <div className="flex justify-between items-start mb-6">
           <span className={`text-4xl font-black leading-none tracking-tighter ${isActive ? 'text-[#FBBF24]' : 'text-black'}`}>
             {stop.label}
-          </span>
-          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400">
-            {stop.date || 'Tappa ITA'}
           </span>
         </div>
 

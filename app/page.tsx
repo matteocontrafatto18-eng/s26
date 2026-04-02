@@ -184,21 +184,23 @@ export default function TuaPage() {
                     onDelete={(id) => removeStop(id)}
                   />
                   
-                  {/* Tasti Spostamento (Appaiono al passaggio del mouse) */}
-                  <div className="absolute bottom-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button 
-                      onClick={() => moveStop(index, 'up')}
-                      className="w-8 h-8 border border-black hover:bg-black hover:text-white flex items-center justify-center text-xs"
-                    >
-                      ↑
-                    </button>
-                    <button 
-                      onClick={() => moveStop(index, 'down')}
-                      className="w-8 h-8 border border-black hover:bg-black hover:text-white flex items-center justify-center text-xs"
-                    >
-                      ↓
-                    </button>
-                  </div>
+{/* Tasti Spostamento - Compatti e sempre visibili */}
+<div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col gap-1 z-20">
+  <button 
+    onClick={(e) => { e.stopPropagation(); moveStop(index, 'up'); }}
+    className="w-8 h-8 bg-white border border-black flex items-center justify-center text-sm hover:bg-black hover:text-white active:bg-gray-200 transition-colors shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] touch-manipulation"
+    title="Sposta su"
+  >
+    ↑
+  </button>
+  <button 
+    onClick={(e) => { e.stopPropagation(); moveStop(index, 'down'); }}
+    className="w-8 h-8 bg-white border border-black flex items-center justify-center text-sm hover:bg-black hover:text-white active:bg-gray-200 transition-colors shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] touch-manipulation"
+    title="Sposta giù"
+  >
+    ↓
+  </button>
+</div>
                 </div>
               ))}
             </div>
