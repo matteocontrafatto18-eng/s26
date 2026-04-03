@@ -42,11 +42,11 @@ export default function MapView({ days, acts, accs, selDay }: MapViewProps) {
     
     return {
       route: days.map((d: Day) => d.coords),
-      stops: stops.map(s => ({
+      stops: stops.map((s,idx) => ({
         la: s.coords[0],
         ln: s.coords[1],
         nm: s.destination.split("→").pop()?.split("/")[0]?.trim() || '',
-        dl: s.label,
+        dl: String(idx + 1).padStart(2, '0'),
         ds: s.destination,
         nt: s.note || '',
         id: s.id,
